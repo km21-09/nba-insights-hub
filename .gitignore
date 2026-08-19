@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------- Project-specific: large NBA data files ----------------------
+# These are hosted externally (GitHub Release) and auto-downloaded by app.py at startup,
+# or regenerated locally via trim_datasets.py / build_db.py. Keep them out of Git.
+data/nba.db
+data/shot_logs.csv
+data/player_game_stats.csv
+data/shot_logs_trimmed.csv
+data/player_game_stats_trimmed.csv
+data/PlayByPlay.parquet
+data/PlayerStatistics.csv
+data/PlayerStatisticsExtended.csv
+data/TeamStatistics.csv
+data/TeamStatisticsExtended.csv
+data/Games.csv
