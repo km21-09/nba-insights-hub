@@ -1,0 +1,6 @@
+body{font-family:Inter,Arial,sans-serif;background:#071021;color:#fff;margin:0;padding:20px}
+.container{max-width:1100px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.card{background:rgba(255,255,255,0.04);padding:12px;border-radius:10px}
+input,select,button{display:block;width:100%;margin:6px 0;padding:8px;border-radius:6px}
+#court{height:420px;background:#04121a;border-radius:8px;overflow:hidden}

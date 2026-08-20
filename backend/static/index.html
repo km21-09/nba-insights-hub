@@ -1,0 +1,324 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NBA Insight Hub</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b0c10;
+      color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #66fcf1;
+    }
+
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 20px;
+      background: #1f2833;
+      color: #c5c6c7;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .tab-btn.active {
+      background: #66fcf1;
+      color: #0b0c10;
+      font-weight: bold;
+    }
+
+    .leaderboard-toggle {
+      padding: 10px 20px;
+      background: #1f2833;
+      color: #c5c6c7;
+      border-radius: 10px;
+      cursor: pointer;
+      border: 2px solid #45a29e;
+      user-select: none;
+    }
+
+    .leaderboard-toggle.active {
+      background: #66fcf1;
+      color: #0b0c10;
+      border-color: #66fcf1;
+      font-weight: bold;
+    }
+
+    .grid {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .card {
+      background: #1f2833;
+      border-radius: 12px;
+      padding: 16px;
+      flex: 1 1 350px;
+      min-width: 350px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    input, select, button {
+      margin: 6px 0;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+    }
+
+    input, select {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    }
+
+    button {
+      background: #45a29e;
+      color: #0b0c10;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #66fcf1;
+    }
+
+    #court, #heatmapCanvas {
+      margin-top: 10px;
+      border: 1px solid #c5c6c7;
+      background: #000000;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    th, td {
+      border: 1px solid #c5c6c7;
+      padding: 6px;
+      text-align: center;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+
+    .about-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #c5c6c7;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding: 20px;
+      color: #c5c6c7;
+      font-size: 13px;
+      border-top: 1px solid #1f2833;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header><h1>NBA Insight Hub</h1></header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="stats">Stats</button>
+      <button class="tab-btn" data-tab="shots">Shot Chart</button>
+      <button class="tab-btn" data-tab="leaderboard">Leaderboard</button>
+      <button class="tab-btn" data-tab="about">About</button>
+    </div>
+
+    <main class="grid">
+      <!-- STATS TAB -->
+      <section class="card tab-content active" id="tab-stats">
+        <h3>Player Stats</h3>
+        <input id="player-input" placeholder="Search player e.g. Stephen Curry">
+        <select id="playerDropdown" size="5"></select>
+        <button id="search-button">Load Stats</button>
+
+        <div id="player-name" style="font-size:18px; margin-top:10px;"></div>
+        <div id="playerInfo" style="margin-top:10px;">
+          <div class="stat-row"><span>Points:</span><span id="points"></span></div>
+          <div class="stat-row"><span>Assists:</span><span id="assists"></span></div>
+          <div class="stat-row"><span>Blocks:</span><span id="blocks"></span></div>
+          <div class="stat-row"><span>Steals:</span><span id="steals"></span></div>
+          <div class="stat-row"><span>FG%:</span><span id="fg"></span></div>
+          <div class="stat-row"><span>FG Made/Attempted:</span><span id="fgMadeTaken"></span></div>
+          <div class="stat-row"><span>3PT%:</span><span id="threePct"></span></div>
+          <div class="stat-row"><span>3PT Made/Attempted:</span><span id="threeMadeTaken"></span></div>
+          <div class="stat-row"><span>FT%:</span><span id="ftPct"></span></div>
+          <div class="stat-row"><span>FT Made/Attempted:</span><span id="ftMadeTaken"></span></div>
+        </div>
+
+        <!-- PLAYER COMPARISON -->
+        <div class="compare-section">
+          <h3>Player Comparison</h3>
+
+          <input id="compareInput1" placeholder="Player 1">
+          <select id="compareDropdown1" size="5"></select>
+
+          <input id="compareInput2" placeholder="Player 2">
+          <select id="compareDropdown2" size="5"></select>
+
+          <button id="compareButton">Compare Players</button>
+
+          <div id="compareResult"></div>
+        </div>
+      </section>
+
+      <!-- SHOT CHART TAB -->
+      <section class="card tab-content" id="tab-shots">
+        <h3>Shot Chart</h3>
+        <input id="shotPlayer" placeholder="Search player for shot chart">
+        <select id="shotPlayerDropdown" size="5"></select>
+        <button id="loadShots">Load Shots</button>
+
+        <!-- FIXED TOGGLES -->
+        <div class="shot-controls" style="margin-top:10px;">
+          <label style="margin-right:20px;">
+            <input type="checkbox" id="toggleMade" checked>
+            <span style="margin-left:5px;">Show Made Shots</span>
+          </label>
+
+          <label style="margin-right:20px;">
+            <input type="checkbox" id="toggleMissed" checked>
+            <span style="margin-left:5px;">Show Missed Shots</span>
+          </label>
+
+          <button id="showHeatmap">Heatmap Mode</button>
+          <button id="showRawShots">Shot Dots Mode</button>
+        </div>
+
+        <p style="color:#c5c6c7; font-size:13px; margin-top:10px;">
+          <em>Note: The shot chart displays all available shots recorded between 2004 and 2025.</em>
+        </p>
+
+        <div style="position:relative; width:940px; height:500px;">
+          <canvas id="court" width="940" height="500"></canvas>
+          <canvas id="heatmapCanvas" width="940" height="500" style="display:none;"></canvas>
+        </div>
+      </section>
+
+      <!-- LEADERBOARD TAB -->
+      <section class="card tab-content" id="tab-leaderboard">
+        <h3>Leaderboards</h3>
+
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+          <button class="leaderboard-toggle active" id="showSeasonLeaderboard">Season/Career Leaderboard</button>
+          <button class="leaderboard-toggle" id="showSingleGame">Single-Game Records</button>
+        </div>
+
+        <div id="seasonLeaderboardSection">
+          <div id="leaderboardPTS"></div>
+          <div id="leaderboardREB"></div>
+          <div id="leaderboardAST"></div>
+          <div id="leaderboardBLK"></div>
+        </div>
+
+        <div id="singleGameSection" style="display:none;">
+          <h3 style="margin-top:20px;">Single-Game Records (Top 5)</h3>
+          <div id="recordPTS"></div>
+          <div id="recordREB"></div>
+          <div id="recordAST"></div>
+          <div id="recordBLK"></div>
+        </div>
+      </section>
+
+      <!-- ABOUT TAB -->
+      <section class="card tab-content" id="tab-about">
+        <h3>About</h3>
+
+        <p class="about-text">
+          NBA Insight Hub is a basketball analytics dashboard that visualizes player performance using
+          real stats and full-court shot charts. You can search players, explore their scoring profile,
+          and see where they take and make shots on a realistic NBA court. Leaderboards let you compare
+          top performers across points, rebounds, assists, and blocks.
+        </p>
+
+        <p class="about-text">
+          Hello, I am Kanav Mittal. I study in Delhi Private School, Dubai in Grade 12, graduating in 2027.
+          Basketball has always been one of the things I connect with the most, the strategy, the numbers,
+          and the stories behind every performance. I’ve always enjoyed breaking things down, understanding
+          patterns, and finding meaning in data, whether it’s through school, personal projects, or just
+          curiosity. Building this app was a way for me to combine that love for analytics with the sport I
+          grew up watching, and to create something that reflects how I see the game: through detail,
+          precision, and genuine passion.
+        </p>
+
+        <h2 style="margin-top:25px; color:#66fcf1;">Legal & Data Notices</h2>
+
+        <p class="about-text">
+          All player names, statistics, and shot data used in this project are sourced from publicly
+          available NBA datasets. This is a personal analytics project created for learning and exploration,
+          and it is not affiliated with or endorsed by the NBA or any of its teams or players.
+        </p>
+
+        <p class="about-text">
+          This project does not collect, store, or process any personal user data. All interactions
+          happen locally within the browser.
+        </p>
+
+        <p class="about-text">
+          Statistical data and shot logs are sourced from publicly available NBA datasets, open data
+          repositories, and historical game logs.
+        </p>
+
+        <h2 style="margin-top:25px; color:#66fcf1;">Contact</h2>
+
+        <p class="about-text">
+          <strong>Email:</strong> kanavm2111@gmail.com
+        </p>
+
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    © 2026 Kanav Mittal — NBA Insight Hub
+  </footer>
+
+  <script src="/app.js?v=13"></script>
+
+</body>
+</html>
