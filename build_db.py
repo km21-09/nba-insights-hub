@@ -57,8 +57,28 @@ cur = conn.cursor()
 cur.execute("CREATE INDEX idx_shots_player ON shots(playerName_lower)")
 cur.execute("CREATE INDEX idx_game_player ON game_stats(playerName_lower)")
 conn.commit()
+
+# ---------------------- VACUUM (reclaim unused space) ----------------------
+print("Running VACUUM to shrink the database ...")
+conn.execute("VACUUM")
 conn.close()
 
 db_size = os.path.getsize(DB_PATH) / (1024 * 1024)
-print(f"\nDone. Created {DB_PATH} ({db_size:.1f} MB)")
-print("Commit this .db file to your repo instead of the large CSVs.")
+print(f"nba.db created: {db_size:.1f} MB")
+
+# ---------------------- COMPRESS (gzip for faster download) ----------------------
+import gzip
+import shutil
+
+GZ_PATH = DB_PATH + ".gz"
+print("Compressing nba.db to nba.db.gz ...")
+
+with open(DB_PATH, "rb") as f_in:
+    with gzip.open(GZ_PATH, "wb", compresslevel=6) as f_out:
+        shutil.copyfileobj(f_in, f_out)
+
+gz_size = os.path.getsize(GZ_PATH) / (1024 * 1024)
+print(f"\nDone.")
+print(f"  {DB_PATH} ({db_size:.1f} MB)  <- keep locally for testing")
+print(f"  {GZ_PATH} ({gz_size:.1f} MB)  <- upload THIS to GitHub Releases instead")
+print(f"\nCompression saved {db_size - gz_size:.1f} MB ({(1 - gz_size/db_size) * 100:.0f}% smaller)")

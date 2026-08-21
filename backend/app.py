@@ -1,6 +1,9 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 import sqlite3
 import os
+import gzip
+import shutil
+import threading
 import urllib.request
 from flask_cors import CORS
 
@@ -11,27 +14,88 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "..", "data")
 DB_PATH = os.path.join(DATA_DIR, "nba.db")
 
-# TODO: replace with your real GitHub Release download URL once uploaded
-NBA_DB_URL = "https://github.com/km21-09/nba-insights-hub/releases/download/v1.0-data/nba.db"
+# Points at the COMPRESSED file now - upload nba.db.gz (not nba.db) to your GitHub Release
+NBA_DB_GZ_URL = "https://github.com/km21-09/nba-insights-hub/releases/download/v1.0-data/nba.db.gz"
+
+# Tracks whether nba.db is ready to be queried yet
+db_ready = threading.Event()
+if os.path.exists(DB_PATH):
+    db_ready.set()
 
 
-def ensure_db_exists():
-    """Download nba.db from GitHub Releases if it's not already present locally.
-    Runs once per fresh deploy/container, so subsequent restarts skip this."""
-    if os.path.exists(DB_PATH):
-        return
+def download_db_in_background():
+    """Downloads nba.db.gz from GitHub Releases and decompresses it, without
+    blocking the app from starting. Visitors see a loading page until this finishes."""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        print(f"nba.db not found locally, downloading compressed db from {NBA_DB_GZ_URL} ...")
 
-    os.makedirs(DATA_DIR, exist_ok=True)
-    print(f"nba.db not found locally, downloading from {NBA_DB_URL} ...")
+        gz_tmp_path = DB_PATH + ".gz.tmp"
+        urllib.request.urlretrieve(NBA_DB_GZ_URL, gz_tmp_path)
+        print("Download complete, decompressing ...")
 
-    tmp_path = DB_PATH + ".tmp"
-    urllib.request.urlretrieve(NBA_DB_URL, tmp_path)
-    os.rename(tmp_path, DB_PATH)  # atomic swap, avoids partial-file issues
+        db_tmp_path = DB_PATH + ".tmp"
+        with gzip.open(gz_tmp_path, "rb") as f_in:
+            with open(db_tmp_path, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
 
-    print("Download complete.")
+        os.rename(db_tmp_path, DB_PATH)  # atomic swap, avoids partial-file issues
+        os.remove(gz_tmp_path)
+
+        print("Decompression complete, database ready.")
+        db_ready.set()
+    except Exception as e:
+        print(f"Failed to download/decompress nba.db: {e}")
 
 
-ensure_db_exists()
+if not db_ready.is_set():
+    threading.Thread(target=download_db_in_background, daemon=True).start()
+
+
+LOADING_PAGE = """
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="5">
+  <title>NBA Insight Hub - Loading</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0b0c10;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    h1 { color: #66fcf1; margin-bottom: 10px; }
+    p { color: #c5c6c7; max-width: 400px; line-height: 1.5; }
+    .spinner {
+      border: 4px solid #1f2833;
+      border-top: 4px solid #66fcf1;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h1>NBA Insight Hub</h1>
+  <p>Loading the database for the first time — this can take a minute or two.
+  This page will refresh automatically, no need to reload manually.</p>
+</body>
+</html>
+"""
 
 
 def get_db():
@@ -39,6 +103,16 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+@app.before_request
+def check_db_ready():
+    """Show a loading page for the homepage, or a 503 for API calls,
+    until nba.db has finished downloading."""
+    if not db_ready.is_set():
+        if request.path.startswith("/api/"):
+            return jsonify({"loading": True, "message": "Database is still downloading, please try again shortly."}), 503
+        return Response(LOADING_PAGE, mimetype="text/html")
 
 
 @app.route("/")
