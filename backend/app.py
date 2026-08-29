@@ -26,13 +26,38 @@ if os.path.exists(DB_PATH):
 def download_db_in_background():
     """Downloads nba.db.gz from GitHub Releases and decompresses it, without
     blocking the app from starting. Visitors see a loading page until this finishes."""
+    import traceback
+
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
-        print(f"nba.db not found locally, downloading compressed db from {NBA_DB_GZ_URL} ...")
+        print(f"nba.db not found locally, downloading compressed db from {NBA_DB_GZ_URL} ...", flush=True)
 
         gz_tmp_path = DB_PATH + ".gz.tmp"
-        urllib.request.urlretrieve(NBA_DB_GZ_URL, gz_tmp_path)
-        print("Download complete, decompressing ...")
+
+        # Manual chunked download with a timeout + progress logging, so a
+        # network stall fails loudly instead of hanging forever silently.
+        req = urllib.request.Request(NBA_DB_GZ_URL, headers={"User-Agent": "nba-insights-hub"})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            total_size = response.getheader("Content-Length")
+            total_size = int(total_size) if total_size else None
+            downloaded = 0
+            chunk_size = 1024 * 1024  # 1 MB
+
+            with open(gz_tmp_path, "wb") as f_out:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    f_out.write(chunk)
+                    downloaded += len(chunk)
+
+                    if total_size:
+                        pct = (downloaded / total_size) * 100
+                        print(f"  downloaded {downloaded / (1024*1024):.1f} MB / {total_size / (1024*1024):.1f} MB ({pct:.0f}%)", flush=True)
+                    else:
+                        print(f"  downloaded {downloaded / (1024*1024):.1f} MB", flush=True)
+
+        print("Download complete, decompressing ...", flush=True)
 
         db_tmp_path = DB_PATH + ".tmp"
         with gzip.open(gz_tmp_path, "rb") as f_in:
@@ -42,10 +67,11 @@ def download_db_in_background():
         os.rename(db_tmp_path, DB_PATH)  # atomic swap, avoids partial-file issues
         os.remove(gz_tmp_path)
 
-        print("Decompression complete, database ready.")
+        print("Decompression complete, database ready.", flush=True)
         db_ready.set()
-    except Exception as e:
-        print(f"Failed to download/decompress nba.db: {e}")
+    except Exception:
+        print("Failed to download/decompress nba.db:", flush=True)
+        traceback.print_exc()
 
 
 if not db_ready.is_set():
