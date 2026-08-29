@@ -25,11 +25,24 @@ if os.path.exists(DB_PATH):
 
 def download_db_in_background():
     """Downloads nba.db.gz from GitHub Releases and decompresses it, without
-    blocking the app from starting. Visitors see a loading page until this finishes."""
+    blocking the app from starting. Visitors see a loading page until this finishes.
+    Uses a lock file so only one process (in case gunicorn runs multiple) does the
+    actual download; readiness itself is checked via the DB file's existence."""
     import traceback
 
+    lock_path = DB_PATH + ".lock"
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
+
+        # Atomic lock: os.O_CREAT|O_EXCL fails if the file already exists,
+        # so only the first process to reach this wins the right to download.
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+        except FileExistsError:
+            print("Another process is already downloading nba.db, skipping.", flush=True)
+            return
+
         print(f"nba.db not found locally, downloading compressed db from {NBA_DB_GZ_URL} ...", flush=True)
 
         gz_tmp_path = DB_PATH + ".gz.tmp"
@@ -69,9 +82,12 @@ def download_db_in_background():
 
         print("Decompression complete, database ready.", flush=True)
         db_ready.set()
+        os.remove(lock_path)
     except Exception:
         print("Failed to download/decompress nba.db:", flush=True)
         traceback.print_exc()
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
 
 
 if not db_ready.is_set():
@@ -134,8 +150,10 @@ def get_db():
 @app.before_request
 def check_db_ready():
     """Show a loading page for the homepage, or a 503 for API calls,
-    until nba.db has finished downloading."""
-    if not db_ready.is_set():
+    until nba.db has finished downloading. Checks the filesystem directly
+    (not an in-memory flag) since gunicorn may run the download thread in
+    a different process than the one handling this request."""
+    if not os.path.exists(DB_PATH):
         if request.path.startswith("/api/"):
             return jsonify({"loading": True, "message": "Database is still downloading, please try again shortly."}), 503
         return Response(LOADING_PAGE, mimetype="text/html")
